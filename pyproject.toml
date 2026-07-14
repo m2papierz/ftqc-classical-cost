@@ -1,0 +1,19 @@
+[project]
+name = "ftqc-classical-cost"
+version = "0.2.0"
+description = "Source-anchored napkin math and figures for the classical side of a fault-tolerant quantum run"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+dependencies = [
+    "matplotlib>=3.8",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.15.21",
+]
+
+# A collection of scripts, not an installable package.
+[tool.uv]
+package = false
