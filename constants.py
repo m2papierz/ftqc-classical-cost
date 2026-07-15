@@ -1,4 +1,4 @@
-"""Quantum-machine specs, classical cost model, and reference baselines."""
+"""Inputs: machine specs, cost models, break-even times, reference baselines."""
 
 from dataclasses import dataclass
 
@@ -76,6 +76,59 @@ class Spec:
 
 # The default preset the blog post is written against.
 GIDNEY_2025 = Spec()
+
+
+@dataclass(frozen=True)
+class Breakeven:
+    """Primitive-call times behind the break-even analysis of Babbush et al.,
+    PRX Quantum 2, 010103 (2021) (arXiv:2011.04149).
+
+    Their model: a classical computer solves a problem with M^degree calls to a
+    classical primitive, a quantum computer with M calls to a quantum one. The
+    break-even runtime (their Eq. 3, and Eq. 5 with classical parallelism S) is
+    computed in model.breakeven(). Note: their "d" is the polynomial degree of
+    the speedup; this repo reserves d for code distance, so it is `degree` here.
+    """
+
+    # Eq. 6: t_G = 30 x 5.5 x 1 us ~ 170 us. A Toffoli costs 5.5*d surface
+    # code cycles in the Gidney & Fowler factories, at ~1 us per round
+    # (decoding included) and a code distance near 30 (code distance, not
+    # degree). The product is 165 us; the paper rounds to 170 and computes
+    # everything downstream from 170.
+    toffoli_s: float = 170e-6
+
+    # Eq. 8: t_Q >= 17 ms. A primitive needs G >= N Toffolis, and the paper
+    # argues no problem worth accelerating fits under about a hundred qubits,
+    # so N = 100. Exactly 100 x toffoli_s.
+    lb_quantum_s: float = 17e-3
+    # Eq. 10: t_C <= 33 ns. A 3 GHz CPU gives t_C = 330 ps x L, with one clock
+    # cycle per Toffoli (L = N = 100) -- an equivalence the paper itself flags
+    # as generous to the quantum side, since one classical cycle often does
+    # the work of thousands of Toffolis.
+    lb_classical_s: float = 33e-9
+
+    # Eq. 9: t_Q = 440 ms. For an N = 512 Sherrington-Kirkpatrick instance,
+    # the compilation of Sanders et al. (PRX Quantum 1, 020312 (2020)) puts
+    # one update at about 2.6e3 Toffolis; 2.6e3 x toffoli_s = 442 ms, rounded.
+    sa_toffolis: float = 2.6e3
+    sa_quantum_s: float = 440e-3
+    # Eq. 11: t_C = 7 ns. A performant classical simulated-annealing step for
+    # the same N = 512 instance, rejected updates included -- techniques of
+    # Isakov et al., Comput. Phys. Commun. 192, 265 (2015); the figure is
+    # quoted via Sanders et al.
+    sa_classical_s: float = 7e-9
+
+    def __post_init__(self) -> None:
+        assert min(vars(self).values()) > 0
+        # Internal consistency with the paper's own arithmetic: the quoted
+        # times are round-offs of the Toffoli counts times the gate time.
+        assert abs(5.5 * 30 * 1e-6 - self.toffoli_s) / self.toffoli_s < 0.04
+        assert abs(100 * self.toffoli_s - self.lb_quantum_s) < 1e-12
+        rel = abs(self.sa_toffolis * self.toffoli_s - self.sa_quantum_s)
+        assert rel / self.sa_quantum_s < 0.01
+
+
+BABBUSH_2021 = Breakeven()
 
 # Classical reference points: round, widely quoted figures for commodity
 # hardware, to calibrate intuition on a log scale. Bit rates are payload rates,
