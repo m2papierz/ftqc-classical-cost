@@ -1,4 +1,6 @@
-"""Palette, typography, and Matplotlib rc for both charts."""
+"""Palette, typography, Matplotlib rc, and the PNG writer for all charts."""
+
+from pathlib import Path
 
 # Two hues carry meaning; the rest are tokens for text and lines.
 ACCENT = "#C2410C"  # quantum items
@@ -26,3 +28,11 @@ RC = {
     "savefig.bbox": "tight",
     "savefig.dpi": 200,
 }
+
+
+def save(fig, stem: str, out_dir: Path) -> None:
+    """Write a chart to *out_dir* as a PNG (savefig rc comes from RC)."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    png = out_dir / f"{stem}.png"
+    fig.savefig(png, facecolor="white")
+    print(f"wrote {png}")
