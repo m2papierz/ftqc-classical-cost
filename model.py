@@ -86,7 +86,7 @@ def verify_bill(derived: SimpleNamespace, spec: Spec) -> None:
     )
     check("raw syndrome per logical qubit, 624 Mb/s", derived.patch_raw_bps, 624e6)
     check(
-        "'tens of Mbps per logical qubit' after sparsification",
+        "'roughly ten Mbps per logical qubit' after sparsification",
         derived.patch_sparse_bps,
         12.5e6,
     )
