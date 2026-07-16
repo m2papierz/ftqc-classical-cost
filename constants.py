@@ -40,7 +40,7 @@ class Spec:
     # S6: d=17 at p=0.1% has a "mean running time of 0.62 microseconds per
     # round"; S1: "At distance 29 with the same noise model ... 3.5
     # microseconds per round". The paper reports nothing at d=25 and gives no
-    # data table, so bill() fits a power law through these two anchors.
+    # data table, so derive_classical_costs() fits a power law through these two anchors.
     # Scaling is NOT linear in d: S5 finds time "linear in the number of
     # nodes", and N ~ d^3 for a d*d*d circuit, so per-round cost is convex
     # in d. Anchors are (distance, microseconds per round per patch).

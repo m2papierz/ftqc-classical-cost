@@ -1,9 +1,10 @@
 """Derive and assert every number the post quotes; charts import from here.
 
-Two independent models live in this module: the classical bill of Gidney's
-RSA-2048 run (bill/verify_bill) and the break-even times for polynomial
-speedups from Babbush et al. (breakeven/verify_breakeven). Running the module
-directly executes both verification suites and renders nothing.
+Two independent models live in this module: the classical cost derivation
+for Gidney's RSA-2048 run (derive_classical_costs/verify_classical_costs)
+and the break-even times for polynomial speedups from Babbush et al.
+(breakeven/verify_breakeven). Running the module directly executes both
+verification suites and renders nothing.
 """
 
 from __future__ import annotations
@@ -31,8 +32,8 @@ def check(claim: str, computed: float, quoted: float, rel: float = 0.01) -> None
     print(f"  ok  {claim:<58} {computed:.4g}  (quoted: {quoted:.4g})")
 
 
-def bill(spec: Spec) -> SimpleNamespace:
-    """Derive every quantity of the classical bill from a spec."""
+def derive_classical_costs(spec: Spec) -> SimpleNamespace:
+    """Derive every quantity of the classical cost model from a spec."""
     derived = SimpleNamespace()
     derived.runtime_s = spec.runtime_days * 86_400
     derived.rounds_per_s = 1e6 / spec.cycle_us
@@ -72,9 +73,9 @@ def bill(spec: Spec) -> SimpleNamespace:
     return derived
 
 
-def verify_bill(derived: SimpleNamespace, spec: Spec) -> None:
-    """Assert every bill number quoted in the post against *spec*."""
-    print("Checking the classical bill as quoted in the post:")
+def verify_classical_costs(derived: SimpleNamespace, spec: Spec) -> None:
+    """Assert every classical cost number quoted in the post against *spec*."""
+    print("Checking the classical costs as quoted in the post:")
     check("raw syndrome stream ~0.5 Tb/s", derived.raw_bps, 0.5e12)
     check("detection-event stream at 2% density, 10 Gb/s", derived.sparse_bps, 10e9)
     check("~27 PB of telemetry over the run", derived.total_bytes, 27e15)
@@ -200,5 +201,5 @@ def verify_breakeven(model: Breakeven) -> None:
 
 
 if __name__ == "__main__":
-    verify_bill(bill(GIDNEY_2025), GIDNEY_2025)
+    verify_classical_costs(derive_classical_costs(GIDNEY_2025), GIDNEY_2025)
     verify_breakeven(BABBUSH_2021)

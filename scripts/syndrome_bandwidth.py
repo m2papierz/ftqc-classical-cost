@@ -1,6 +1,6 @@
 """Chart: the syndrome stream next to interconnects engineers plan around.
 
-Verifies the full classical bill (this is the bill's chart), then renders.
+Verifies the full classical cost model (this is the cost model's chart), then renders.
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 from constants import BANDWIDTH_REFS, GIDNEY_2025
-from model import bill, verify_bill
+from model import derive_classical_costs, verify_classical_costs
 from style import ACCENT, GRID, INK, LABEL_SIZE, NEUTRAL, RC, save
 
 
@@ -36,8 +36,8 @@ def main() -> None:
         else Path(__file__).resolve().parent.parent / "results"
     )
     spec = GIDNEY_2025
-    derived = bill(spec)
-    verify_bill(derived, spec)
+    derived = derive_classical_costs(spec)
+    verify_classical_costs(derived, spec)
 
     # One neutral hue for classical references, one accent hue for quantum items.
     entries = [(label, bps, NEUTRAL) for label, bps in BANDWIDTH_REFS]

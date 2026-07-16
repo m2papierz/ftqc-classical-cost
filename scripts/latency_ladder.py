@@ -1,7 +1,7 @@
 """Chart: classical latency ladder vs. QEC timescales.
 
 Draws inputs verbatim (nothing derived), so there is no verify step here;
-the quoted comparisons around these numbers are asserted in model.verify_bill.
+the quoted comparisons around these numbers are asserted in model.verify_classical_costs.
 """
 
 from __future__ import annotations
