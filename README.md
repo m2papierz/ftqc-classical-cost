@@ -1,9 +1,9 @@
 # ftqc-classical-cost
 
-Scripts for generating the figures of the post [*QPU as Another Accelerator: A Software Engineers's Take on FTQC*](https://mateuszpapierz.dev/blog/qpu-as-another-accelerator). They itemize the classical bill of one fault-tolerant run for the RSA-2048 factoring machine of [Gidney 2025](https://arxiv.org/abs/2505.15917), place each figure next to a familiar classical reference point (PCIe, 400 GbE, context switches, scheduler ticks), and recompute the break-even runtimes for polynomial speedups from [Babbush et al. 2021](https://arxiv.org/abs/2011.04149). Every number quoted in the post is recomputed and asserted on each run.
+Scripts for generating the figures of the post [*QPU as Another Accelerator: A Software Engineer's Take on FTQC*](https://mateuszpapierz.dev/blog/qpu-as-another-accelerator). They itemize the classical bill of one fault-tolerant run for the RSA-2048 factoring machine of [Gidney 2025](https://arxiv.org/abs/2505.15917), place each figure next to a familiar classical reference point (PCIe, 400 GbE, context switches, scheduler ticks), and recompute the break-even runtimes for polynomial speedups from [Babbush et al. 2021](https://arxiv.org/abs/2011.04149). Every number quoted in the post is recomputed and asserted on each run.
 
 > [!IMPORTANT]
-> Back-of-the-envelope by design: uniform code distance, flat ancilla fraction, decode cost extrapolated past what has been demonstrated. Every input is sourced in [Sources](#sources), a row apiece — verbatim quote and section, a standards or vendor document, or marked as simulated. See [Model](#model) for where this deliberately departs from Gidney's actual layout.
+> Back-of-the-envelope by design: uniform code distance, flat ancilla fraction, decode cost extrapolated past what has been demonstrated. Every input is cited with its source in [Sources](#sources). See [Model](#model) for where this deliberately departs from Gidney's actual layout.
 
 ## What it computes
 
