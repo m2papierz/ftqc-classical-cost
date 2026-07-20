@@ -53,10 +53,11 @@ def derive_classical_costs(spec: Spec) -> SimpleNamespace:
     derived.patch_sparse_bps = derived.patch_raw_bps * spec.detection_fraction
 
     # Decode cost at d, fitted through sparse blossom's two published anchors.
-    # The paper reports no d=25 point, so extrapolate on its own terms: cost is
-    # linear in node count and N ~ d^3, hence a power law in d (exponent ~3.2),
-    # not the straight line between anchors. Linear interpolation would read
-    # 2.54 us/round here -- ~17% high, because the true curve is convex.
+    # The paper reports no d=25 point, so fit a power law through the two
+    # published per-round figures (exponent ~3.2). The fit is empirical and
+    # makes no scaling claim of its own; the empirical curve is steeper than
+    # the ~d^2 that "linear in node count" alone would predict per round.
+    # Linear interpolation between the anchors would read 2.54 us/round here.
     (d_lo, t_lo), (d_hi, t_hi) = spec.decode_anchor_lo, spec.decode_anchor_hi
     derived.decode_exponent = math.log(t_hi / t_lo) / math.log(d_hi / d_lo)
     derived.us_per_round_per_patch = t_lo * (d / d_lo) ** derived.decode_exponent

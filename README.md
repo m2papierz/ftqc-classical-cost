@@ -34,12 +34,14 @@ The split: inputs live in [`constants.py`](constants.py) — the machine and cos
 ```python
 from dataclasses import replace
 from constants import GIDNEY_2025
-from model import bill
+from model import derive_classical_costs
 
-bill(replace(GIDNEY_2025, physical_qubits=20_000_000, runtime_days=0.33))
+spec = replace(GIDNEY_2025, physical_qubits=20_000_000, runtime_days=0.33)
+costs = derive_classical_costs(spec)
+print(f"{costs.raw_bps:.3g} b/s raw syndrome, {costs.cores:.0f} decoder cores")
 ```
 
-The checks pin the published numbers, so `main()` fails loudly for variants.
+Derivation and verification are separate on purpose: `derive_classical_costs` accepts any spec, while the checks in `verify_classical_costs` pin the published numbers and fail loudly for variants.
 
 ## Model
 
@@ -48,7 +50,7 @@ A uniform distance-25 stand-in for Gidney's machine, not a reproduction of it. W
 - **Telemetry**: one syndrome bit per measure qubit per round; half of the physical qubits are measure qubits (a rotated patch is d^2 data + d^2-1 measure). Machine-wide that is an upper bound, routing space is unmeasured.
 - **Detection density**: the ~2% sparsification factor is *simulated, not cited*. Stim, `rotated_memory_z`, uniform depolarizing at p = 0.1% (Gidney's noise model, "1 error per 1000 gates"), bulk detectors at d = 25, gives **1.86%**. Google's measured **8.5%** is a different regime, real silicon at SI1000 p ~ 0.3-0.4%, and is not what this machine assumes. The resulting per-patch sparsified rate is **12.5 Mb/s**, closer to "about ten" than "tens of" Mbps per logical qubit (Battistel et al. [[2](https://arxiv.org/abs/2303.00054)]); the blog text has been updated to "roughly ten".
 - **Patches**: uniform d=25 patches of 2d^2-1 = 1249 qubits => ~800 patches. Gidney's machine is heterogeneous: 1280 cold logical qubits in yoked surface codes at 430 physical qubits each, 131 hot patches at 2(d+1)^2 = 1352 each, plus a 7x18 compute region, **1537 logical qubits over 897,864 physical**, rounded up to "one million" for slack. The ~800 figure is this model's, not the paper's.
-- **Decoder compute**: extrapolated from the single-core sparse blossom benchmarks of [Higgott & Gidney 2025](https://arxiv.org/abs/2303.15933), which report 0.62 µs/round at d=17 and 3.5 µs/round at d=29 but **nothing at d=25**. Cost is fitted as a power law (exponent ~ 3.2) rather than interpolated linearly, because the paper's scaling is linear in *node count* and N ~ d^3, so per-round cost is convex in d. Linear interpolation would read 2.54 µs/round; the fit gives 2.2.
+- **Decoder compute**: extrapolated from the single-core sparse blossom benchmarks of [Higgott & Gidney 2025](https://arxiv.org/abs/2303.15933), which report 0.62 µs/round at d=17 and 3.5 µs/round at d=29 but **nothing at d=25**. Cost is fitted as a power law through those two per-round anchors, giving an exponent of ~3.2 and 2.2 µs/round at d=25. The fit makes no scaling claim of its own — it only interpolates the paper's published points on log-log axes. For reference: linear interpolation between the anchors would read 2.54 µs, and the paper's linear-in-node-count scaling alone (per-round detector count ~ d^2) would read 1.34 µs, so the empirical curve grows faster than the node count and the fit sits between the two.
 - **What the core count is not**: sparse blossom's benchmarks are **batch decoding of pre-sampled shots on one M1 Max core**. The paper has no streaming support and states that real-time decoding at scale "motivates the development of a parallelised implementation", i.e. the thing this number assumes is the thing the paper names as unsolved. The core count also assumes decode parallelises across patches with zero overhead. It is an optimistic floor on the *throughput* problem; the binding constraint is the µs-scale *latency* problem, which is why production designs use FPGAs/ASICs.
 - **Demonstrated latency**: [Google's below-threshold experiment](https://www.nature.com/articles/s41586-024-08449-y), 63 +/- 17 µs at d=5, on the 72-qubit processor, from a parallel C++ *software* decoder with exclusive CPU access. It is decode time only and "does not yet include feedback into the logical circuit", so it is not a reaction time and is not directly comparable to Gidney's 10 µs budget.
 - **Break-even ladder**: the model is Babbush et al.'s closed form, T* = tQ(tQ*S/tC)^(1/(d-1)) (their Eq. 3 and, with classical parallelism S, Eq. 5), evaluated at their two primitives: an optimistic 100-Toffoli "lower bound" and a compiled N = 512 simulated-annealing step. **Nothing is transcribed from their Table I** — every plotted value is recomputed and asserted against the printed table (2 significant figures; max deviation 2.7%). The optimism is the paper's own and inherited deliberately: no prefactor overhead in call counts, one classical clock cycle per Toffoli, serial CCZ distillation, S ~ P for embarrassingly parallel classical competition. Their *d* is the **polynomial degree** of the speedup, not code distance, so the code names it `degree`. The dashed reference line is this repo's other model — the 5-day RSA-2048 runtime — putting the two papers on one axis.
@@ -79,7 +81,7 @@ Every input and its exact basis — a verbatim quote, a standards or vendor docu
 |---|---|---|
 | `decode_anchor_lo` | (17, 0.62 µs) | §6: *"for distance-17 surface code circuits with p = 0.1% circuit-level noise, we observe a mean running time of 0.62 microseconds per round"* |
 | `decode_anchor_hi` | (29, 3.5 µs) | §1: *"At distance 29 with the same noise model … PyMatching takes 3.5 microseconds per round to decode on a single core"* |
-| scaling exponent | 3.24 (**derived**) | §5: *"the running time is linear in the number of nodes"*; N ~ d^3 for a dxdxd circuit => convex in d. Fitted through the two anchors above. |
+| scaling exponent | 3.24 (**derived**) | Empirical power-law fit through the two per-round anchors above. Steeper than the ~d^2 that §5's *"running time is linear in the number of nodes"* alone would predict per round. |
 | decode cost @ d=25 | 2.16 µs/round (**derived**) | **The paper reports no d=25 point** and publishes no data table (Fig. 10 is a log-log plot). |
 | benchmark hardware | 1 core, Apple M1 Max | Fig. 10 caption: *"All three decoders use a single core of an M1 Max processor."* No clock speed is stated anywhere. |
 

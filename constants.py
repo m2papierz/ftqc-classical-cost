@@ -41,9 +41,11 @@ class Spec:
     # round"; S1: "At distance 29 with the same noise model ... 3.5
     # microseconds per round". The paper reports nothing at d=25 and gives no
     # data table, so derive_classical_costs() fits a power law through these two anchors.
-    # Scaling is NOT linear in d: S5 finds time "linear in the number of
-    # nodes", and N ~ d^3 for a d*d*d circuit, so per-round cost is convex
-    # in d. Anchors are (distance, microseconds per round per patch).
+    # The fit is purely empirical: it interpolates the paper's published
+    # per-round points on log-log axes (exponent ~3.2) and makes no scaling
+    # claim of its own. Note it is steeper than the ~d^2 that S5's "running
+    # time is linear in the number of nodes" alone would predict per round.
+    # Anchors are (distance, microseconds per round per patch).
     decode_anchor_lo: tuple[int, float] = (17, 0.62)
     decode_anchor_hi: tuple[int, float] = (29, 3.5)
 
