@@ -1,7 +1,7 @@
-"""Chart: classical latency ladder vs. QEC timescales.
+"""Chart: QEC timescales against classical latency reference points.
 
-Draws inputs verbatim (nothing derived), so there is no verify step here;
-the quoted comparisons around these numbers are asserted in model.verify_classical_costs.
+Plots pinned inputs only, so there is no verify step; renders
+results/latency_ladder.png.
 """
 
 from __future__ import annotations
@@ -24,8 +24,7 @@ from matplotlib.figure import Figure
 from constants import GIDNEY_2025, LATENCY_REFS, Spec
 from style import ACCENT, GRID, INK, NEUTRAL, RC, TICK_SIZE, save
 
-# Shape encodes the source machine: circle = Gidney's model or classical,
-# diamond = Google's 72-qubit device (an achieved measurement, not a deadline).
+# kind -> (colour, marker, legend label). Marker encodes the source machine.
 KINDS: dict[str, tuple[str, str, str]] = {
     "classical": (NEUTRAL, "o", "classical reference point"),
     "deadline": (ACCENT, "o", "QEC deadline (Gidney's machine)"),
@@ -36,7 +35,7 @@ _DECADE_TICKS: list[float] = [0.1, 1, 10, 100, 1000]
 
 
 def _build_rows(spec: Spec) -> list[tuple[str, float, str]]:
-    """Merge classical reference latencies with QEC deadlines, sorted by time."""
+    """Latency references plus QEC deadlines as (label, microseconds, kind), ascending."""
     return sorted(
         [(label, us, "classical") for label, us in LATENCY_REFS]
         + [
@@ -53,7 +52,6 @@ def _build_rows(spec: Spec) -> list[tuple[str, float, str]]:
 
 
 def _plot(rows: list[tuple[str, float, str]]) -> Figure:
-    """Draw the latency ladder and return the figure."""
     with plt.rc_context(RC):
         fig, ax = plt.subplots(figsize=(9, 4.0))
         ax.set_xscale("log")
@@ -75,7 +73,7 @@ def _draw_rows(
     rows: list[tuple[str, float, str]],
     floor: float,
 ) -> None:
-    """Plot each latency as a rail from the axis floor to its dot."""
+    """Draw each row as a rail from the axis floor to its dot."""
     for y, (_, us, kind) in enumerate(rows):
         colour, marker, _ = KINDS[kind]
         ax.hlines(y, floor, us, color=GRID, lw=1.0, zorder=1)
@@ -91,13 +89,12 @@ def _draw_rows(
 
 
 def _style_axes(ax: plt.Axes, rows: list[tuple[str, float, str]]) -> None:
-    """Configure ticks, labels, legend, and spines."""
     ax.set_yticks(range(len(rows)))
     ax.set_yticklabels(
         [f"{label}   {us:g} µs" for label, us, _ in rows],
         fontsize=TICK_SIZE,
     )
-    # Tick labels wear their dot's hue -- ACCENT on white clears WCAG AA (~5.9:1).
+    # Tick labels take their dot's hue; ACCENT on white is ~5.9:1, clears WCAG AA.
     for tick, (_, _, kind) in zip(ax.get_yticklabels(), rows):
         tick.set_color(INK if kind == "classical" else ACCENT)
 

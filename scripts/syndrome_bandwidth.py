@@ -1,6 +1,6 @@
-"""Chart: the syndrome stream next to interconnects engineers plan around.
+"""Chart: syndrome stream rates against classical interconnect bandwidths.
 
-Verifies the full classical cost model (this is the cost model's chart), then renders.
+Verifies the classical cost model, then renders results/syndrome_bandwidth.png.
 """
 
 from __future__ import annotations
@@ -55,7 +55,7 @@ def _build_entries(
     spec: Spec,
     derived: SimpleNamespace,
 ) -> list[tuple[str, float, str]]:
-    """Merge classical bandwidth references with derived syndrome rates, sorted."""
+    """Bandwidth references plus derived syndrome rates as (label, bps, colour), ascending."""
     entries: list[tuple[str, float, str]] = [
         (label, bps, NEUTRAL) for label, bps in BANDWIDTH_REFS
     ]
@@ -86,7 +86,6 @@ def _build_entries(
 
 
 def _plot(entries: list[tuple[str, float, str]]) -> Figure:
-    """Draw the syndrome bandwidth chart and return the figure."""
     labels, values, colors = zip(*entries)
 
     with plt.rc_context(RC):
@@ -110,7 +109,7 @@ def _draw_bars(
     values: tuple[float, ...],
     colors: tuple[str, ...],
 ) -> None:
-    """Draw horizontal bars with bit-rate labels at each tip."""
+    """Draw horizontal bars, each labelled with its rate at the tip."""
     bars = ax.barh(
         labels,
         values,
@@ -132,7 +131,6 @@ def _draw_bars(
 
 
 def _style_axes(ax: plt.Axes) -> None:
-    """Configure ticks, labels, and spines."""
     ax.set_xticks(_DECADE_TICKS)
     ax.set_xticklabels(_DECADE_LABELS)
     ax.set_xlabel("sustained data rate (log scale)")
