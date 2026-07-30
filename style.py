@@ -1,12 +1,11 @@
-"""Palette, typography, Matplotlib rc, and the PNG writer for all charts."""
+"""Palette, typography, Matplotlib rc, and the PNG writer shared by all charts."""
 
 from pathlib import Path
 
-# Two hues carry meaning; the rest are tokens for text and lines.
 ACCENT = "#C2410C"  # quantum items
 NEUTRAL = "#94A3B8"  # classical reference points
-INK = "#1E293B"
-GRID = "#CBD5E1"  # recessive decade gridlines, shared by both charts
+INK = "#1E293B"  # text, spines, ticks
+GRID = "#CBD5E1"  # decade gridlines
 
 TITLE_SIZE = 12.5
 LABEL_SIZE = 10.5  # data-point / bar labels
@@ -31,7 +30,7 @@ RC = {
 
 
 def save(fig, stem: str, out_dir: Path) -> None:
-    """Write a chart to *out_dir* as a PNG (savefig rc comes from RC)."""
+    """Write *fig* to out_dir/<stem>.png, creating the directory if needed."""
     out_dir.mkdir(parents=True, exist_ok=True)
     png = out_dir / f"{stem}.png"
     fig.savefig(png, facecolor="white")

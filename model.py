@@ -1,10 +1,9 @@
-"""Derive and assert every number the post quotes; charts import from here.
+"""Derivations and their verification against the published figures.
 
-Two independent models live in this module: the classical cost derivation
-for Gidney's RSA-2048 run (derive_classical_costs/verify_classical_costs)
-and the break-even times for polynomial speedups from Babbush et al.
-(breakeven/verify_breakeven). Running the module directly executes both
-verification suites and renders nothing.
+Two independent models: the classical cost of Gidney's RSA-2048 run
+(derive_classical_costs / verify_classical_costs) and the break-even times for
+polynomial speedups from Babbush et al. 2021 (breakeven / verify_breakeven).
+Run as a script, both verification suites execute and nothing is rendered.
 """
 
 from __future__ import annotations
@@ -25,7 +24,7 @@ MIN, HOUR, DAY, YEAR = 60.0, 3600.0, 86400.0, 365.25 * 86400.0
 
 
 def check(claim: str, computed: float, quoted: float, rel: float = 0.01) -> None:
-    """Assert a computed value against the figure quoted in the post/paper."""
+    """Assert a computed value against its published counterpart, printing both."""
     assert math.isclose(computed, quoted, rel_tol=rel), (
         f"FAIL {claim}: computed {computed:.4g}, quoted {quoted:.4g}"
     )
@@ -33,7 +32,11 @@ def check(claim: str, computed: float, quoted: float, rel: float = 0.01) -> None
 
 
 def derive_classical_costs(spec: Spec) -> SimpleNamespace:
-    """Derive every quantity of the classical cost model from a spec."""
+    """Derive the classical cost quantities from *spec*.
+
+    Rates are bits per second, byte totals bytes, decode cost microseconds per
+    round per patch, logical clock hertz.
+    """
     derived = SimpleNamespace()
     derived.runtime_s = spec.runtime_days * 86_400
     derived.rounds_per_s = 1e6 / spec.cycle_us
@@ -45,38 +48,33 @@ def derive_classical_costs(spec: Spec) -> SimpleNamespace:
     derived.sparse_bps = derived.raw_bps * spec.detection_fraction
     derived.total_bytes = derived.raw_bps * derived.runtime_s / 8
 
-    # Surface-code patch: d^2 data qubits + (d^2 - 1) measure qubits.
+    # Rotated patch: d^2 data qubits + (d^2 - 1) measure qubits.
     d = spec.code_distance
     derived.patch_qubits = 2 * d * d - 1
     derived.patches = spec.physical_qubits // derived.patch_qubits
     derived.patch_raw_bps = (d * d - 1) * derived.rounds_per_s
     derived.patch_sparse_bps = derived.patch_raw_bps * spec.detection_fraction
 
-    # Decode cost at d, fitted through sparse blossom's two published anchors.
-    # The paper reports no d=25 point, so fit a power law through the two
-    # published per-round figures (exponent ~3.2). The fit is empirical and
-    # makes no scaling claim of its own; the empirical curve is steeper than
-    # the ~d^2 that "linear in node count" alone would predict per round.
-    # Linear interpolation between the anchors would read 2.54 us/round here.
+    # Sparse blossom publishes no d=25 point, so interpolate its two anchors as
+    # a power law on log-log axes (exponent ~3.2). Empirical: it asserts no
+    # scaling law of its own. Linear interpolation would read 2.54 us/round.
     (d_lo, t_lo), (d_hi, t_hi) = spec.decode_anchor_lo, spec.decode_anchor_hi
     derived.decode_exponent = math.log(t_hi / t_lo) / math.log(d_hi / d_lo)
     derived.us_per_round_per_patch = t_lo * (d / d_lo) ** derived.decode_exponent
 
-    # Cores that keep decoding at the pace syndrome data is produced. Assumes
-    # decode parallelises across patches with no overhead -- an optimistic floor.
+    # Cores that keep decode pace with syndrome production, assuming decode
+    # parallelises across patches with no overhead.
     derived.cores = derived.patches * derived.us_per_round_per_patch / spec.cycle_us
 
-    # One logical time step is ~d rounds (Litinski, arXiv:1808.02892; quoted in
-    # README "Sources"). Approximate by the paper's own admission, and it covers
-    # only operations whose cost scales with d -- initialization and
-    # single-qubit measurement do not.
+    # One logical time step is ~d rounds (Litinski, arXiv:1808.02892), approximate
+    # by that paper's own caveat and covering only operations that scale with d.
     derived.logical_clock_hz = 1e6 / (d * spec.cycle_us)
     return derived
 
 
 def verify_classical_costs(derived: SimpleNamespace, spec: Spec) -> None:
-    """Assert every classical cost number quoted in the post against *spec*."""
-    print("Checking the classical costs as quoted in the post:")
+    """Assert the classical cost derivation for *spec* against the published figures."""
+    print("Checking the classical cost model:")
     check("raw syndrome stream ~0.5 Tb/s", derived.raw_bps, 0.5e12)
     check("detection-event stream at 2% density, 10 Gb/s", derived.sparse_bps, 10e9)
     check("~27 PB of telemetry over the run", derived.total_bytes, 27e15)
@@ -88,12 +86,14 @@ def verify_classical_costs(derived: SimpleNamespace, spec: Spec) -> None:
     )
     check("raw syndrome per logical qubit, 624 Mb/s", derived.patch_raw_bps, 624e6)
     check(
-        "'roughly ten Mbps per logical qubit' after sparsification",
+        "detection events per logical qubit, 12.5 Mb/s",
         derived.patch_sparse_bps,
         12.5e6,
     )
     check("~800 uniform distance-25 patches", derived.patches, 800)
-    check("sparse blossom scales ~d^3.2, not linearly", derived.decode_exponent, 3.24)
+    check(
+        "decode cost exponent from the two anchors, ~3.2", derived.decode_exponent, 3.24
+    )
     check(
         "~2.2 µs/round/patch decode cost at d=25",
         derived.us_per_round_per_patch,
@@ -112,7 +112,6 @@ def verify_classical_costs(derived: SimpleNamespace, spec: Spec) -> None:
         10,
     )
 
-    # Qualitative comparisons made in the text.
     refs = dict(BANDWIDTH_REFS)
     assert derived.raw_bps > refs["400 GbE network port"], (
         "raw stream should exceed 400 GbE"
@@ -130,19 +129,18 @@ def verify_classical_costs(derived: SimpleNamespace, spec: Spec) -> None:
 
 
 def breakeven(t_q: float, t_c: float, degree: int, s: float) -> float:
-    """Break-even runtime T* of Babbush et al., Eq. 3 (S=1) and Eq. 5.
+    """Break-even runtime T* in seconds, Babbush et al. 2021 Eq. 3 (S=1) and Eq. 5.
 
-    t_q/t_c are the quantum/classical primitive-call times, degree the order
-    of the polynomial speedup, and s the classical parallel speedup factor
-    (their S; ~P for the embarrassingly parallel problems they consider).
+    t_q and t_c are quantum and classical primitive-call times in seconds,
+    degree the polynomial degree of the speedup, s the classical parallel
+    speedup factor (their S).
     """
     return t_q * (t_q * s / t_c) ** (1.0 / (degree - 1))
 
 
-# Every plotted value, as printed in Babbush et al.'s Table I (2 significant
-# figures). Nothing is transcribed into the chart from the table; the chart
-# recomputes from the closed form, and these rows pin the recomputation to the
-# publication. Columns: primitive ("lb" / "sa"), degree, S, printed value.
+# Babbush et al. 2021 Table I as printed, to 2 significant figures. Charts
+# recompute from the closed form; these rows pin the recomputation.
+# Columns: primitive ("lb" / "sa"), degree, S, printed value in seconds.
 TABLE_I = [
     ("lb", 2, 1.0, 2.4 * HOUR),
     ("lb", 2, 1e3, 100 * DAY),
@@ -160,7 +158,7 @@ TABLE_I = [
 
 
 def primitive_times(model: Breakeven, primitive: str) -> tuple[float, float]:
-    """(t_q, t_c) for a named primitive: "lb" or "sa"."""
+    """(t_q, t_c) in seconds for a named primitive: "lb" or "sa"."""
     return {
         "lb": (model.lb_quantum_s, model.lb_classical_s),
         "sa": (model.sa_quantum_s, model.sa_classical_s),
@@ -168,7 +166,7 @@ def primitive_times(model: Breakeven, primitive: str) -> tuple[float, float]:
 
 
 def verify_breakeven(model: Breakeven) -> None:
-    """Assert the recomputed break-even times against Babbush et al."""
+    """Assert the recomputed break-even times against Babbush et al. 2021."""
     print("Checking the break-even ladder against Babbush et al. (2021):")
     # Table I prints 2 significant figures; observed max deviation is 2.7%.
     for primitive, degree, s, printed in TABLE_I:
@@ -180,18 +178,16 @@ def verify_breakeven(model: Breakeven) -> None:
             rel=0.05,
         )
 
-    # Prose claims reused in the post. The paper's example: put P = 3,000 CPUs
-    # on the classical side (S ~ P) and the 100-Toffoli primitive's break-even
-    # becomes, in its words, one year. Recomputed it is ten months (304 days),
-    # which the paper rounds up; the post quotes the computed figure.
+    # Prose example: P = 3,000 CPUs (S ~ P) against the 100-Toffoli primitive.
+    # The paper calls the result one year; recomputed it is 304 days.
     check(
         "prose: lower bound vs 3,000 cores, ~ten months ('one year')",
         breakeven(model.lb_quantum_s, model.lb_classical_s, 2, 3e3),
         304 * DAY,
         rel=0.02,
     )
-    # Table II (Eq. 12): Toffoli distillation sped up R-fold divides the
-    # quadratic break-even by R^2. At R = 10, S = 1e3: "8.8 years".
+    # Table II (Eq. 12): an R-fold distillation speedup divides the quadratic
+    # break-even by R^2. At R = 10, S = 1e3 the table prints 8.8 years.
     check(
         "Table II: sa, degree 2, S = 1e3, distillation speedup R = 10",
         breakeven(model.sa_quantum_s, model.sa_classical_s, 2, 1e3) / 10**2,

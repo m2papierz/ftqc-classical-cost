@@ -1,60 +1,40 @@
-"""Inputs: machine specs, cost models, break-even times, reference baselines."""
+"""Pinned inputs: machine spec, decoder anchors, break-even primitive times, reference points.
+
+Comments give the citation; README "Sources" gives the verbatim basis for each value.
+"""
 
 from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
 class Spec:
-    """Uniform d-25 stand-in for Gidney 2025 (arXiv:2505.15917) RSA-2048 machine."""
+    """Uniform distance-25 stand-in for the RSA-2048 machine of Gidney 2025 (arXiv:2505.15917)."""
 
-    # The machine — Gidney 2025, arXiv:2505.15917.
-    # Abstract: "less than a million noisy qubits". The paper states no exact
-    # total; components sum to 897,864 and S3.2 rounds up: "I report the
-    # physical qubit count as one million instead of 900 thousand" for slack.
+    # Components sum to 897,864; Gidney 2025 §3.2 reports one million for slack.
     physical_qubits: int = 1_000_000
-    cycle_us: float = 1.0  # abstract: "a surface code cycle time of 1 microsecond"
-    # Abstract: "a control system reaction time of 10 microseconds". Inherited
-    # from Gidney & Ekera 2021; this paper never defines the term.
+    cycle_us: float = 1.0  # Gidney 2025 abstract
+    # Gidney 2025 abstract; the term is inherited and never defined there.
     reaction_us: float = 10.0
-    # S3.2: "Dividing 4.63 days by 93.3% gives the actual time estimate per
-    # factoring: 4.96 days. Which I round up to a week for slack."
-    runtime_days: float = 5.0
+    runtime_days: float = 5.0  # Gidney 2025 §3.2: 4.96 days per factoring
     answer_bytes: int = 256  # RSA-2048 factorization: two 1024-bit primes
 
-    # Error correction, superconducting-flavoured. Ancilla fraction: a rotated
-    # surface-code patch has d^2 data + (d^2 - 1) measure qubits, so ~1/2.
-    # Machine-wide this is an upper bound — routing space is unmeasured.
+    # A rotated patch is d^2 data + (d^2 - 1) measure qubits, so ~1/2. Applied
+    # machine-wide this is an upper bound: routing space is unmeasured.
     ancilla_fraction: float = 0.5
-    # S3.2: "a distance of 25 is sufficient for normal surface code patches to
-    # reach a per-patch per-round logical error rate of 10^-15". Applies to hot
-    # storage and the compute region; cold storage is yoked (no stated distance).
-    code_distance: int = 25
-    # Stim, rotated_memory_z, uniform depolarizing at p=0.1% (Gidney S3.2's
-    # noise model: "1 error per 1000 gates"), bulk detectors, d=25: 1.86%.
-    # Rounded to 2%. Not Google's 8.5% — that is measured silicon at SI1000
-    # p~0.3-0.4%, a different (noisier) machine than Gidney assumes.
+    code_distance: int = 25  # Gidney 2025 §3.2; hot storage and compute region
+    # Stim rotated_memory_z, uniform depolarizing p=0.1%, bulk detectors, d=25:
+    # 1.86%, rounded. Google's measured 8.5% is a noisier regime (SI1000).
     detection_fraction: float = 0.02
 
-    # The decoder — single-core sparse blossom (Higgott & Gidney 2025,
-    # arXiv:2303.15933), benchmarked on one core of an Apple M1 Max.
-    # S6: d=17 at p=0.1% has a "mean running time of 0.62 microseconds per
-    # round"; S1: "At distance 29 with the same noise model ... 3.5
-    # microseconds per round". The paper reports nothing at d=25 and gives no
-    # data table, so derive_classical_costs() fits a power law through these two anchors.
-    # The fit is purely empirical: it interpolates the paper's published
-    # per-round points on log-log axes (exponent ~3.2) and makes no scaling
-    # claim of its own. Note it is steeper than the ~d^2 that S5's "running
-    # time is linear in the number of nodes" alone would predict per round.
-    # Anchors are (distance, microseconds per round per patch).
+    # Single-core sparse blossom, (distance, microseconds per round per patch).
+    # Higgott & Gidney 2025 (arXiv:2303.15933) §6 and §1. No d=25 point is
+    # published, so derive_classical_costs() fits a power law through these two.
     decode_anchor_lo: tuple[int, float] = (17, 0.62)
     decode_anchor_hi: tuple[int, float] = (29, 3.5)
 
-    # Demonstrated state of the art — Google Quantum AI, Nature 638, 920
-    # (2025), abstract: "an average decoder latency of 63 us at distance-5 up
-    # to a million cycles, with a cycle time of 1.1 us". Reported as 63 +/- 17
-    # us, on the 72-qubit processor, from a parallel C++ *software* decoder
-    # given exclusive CPU access. It is decode time only: it "does not yet
-    # include feedback into the logical circuit", so it is not a reaction time.
+    # Google Quantum AI, Nature 638, 920 (2025): 63 +/- 17 us mean decoder
+    # latency on the 72-qubit processor. Decode time only, no feedback into the
+    # logical circuit, so it is not a reaction time.
     demonstrated_distance: int = 5
     demonstrated_latency_us: float = 63.0
 
@@ -76,54 +56,38 @@ class Spec:
         )
 
 
-# The default preset the blog post is written against.
 GIDNEY_2025 = Spec()
 
 
 @dataclass(frozen=True)
 class Breakeven:
-    """Primitive-call times behind the break-even analysis of Babbush et al.,
-    PRX Quantum 2, 010103 (2021) (arXiv:2011.04149).
+    """Primitive-call times of Babbush et al. 2021 (arXiv:2011.04149), in seconds.
 
-    Their model: a classical computer solves a problem with M^degree calls to a
-    classical primitive, a quantum computer with M calls to a quantum one. The
-    break-even runtime (their Eq. 3, and Eq. 5 with classical parallelism S) is
-    computed in model.breakeven(). Note: their "d" is the polynomial degree of
-    the speedup; this repo reserves d for code distance, so it is `degree` here.
+    Their model: classical solves in M^degree calls to a classical primitive,
+    quantum in M calls to a quantum one. Their "d" is the polynomial degree of
+    the speedup; this repo reserves d for code distance and calls it `degree`.
     """
 
-    # Eq. 6: t_G = 30 x 5.5 x 1 us ~ 170 us. A Toffoli costs 5.5*d surface
-    # code cycles in the Gidney & Fowler factories, at ~1 us per round
-    # (decoding included) and a code distance near 30 (code distance, not
-    # degree). The product is 165 us; the paper rounds to 170 and computes
-    # everything downstream from 170.
+    # Eq. 6: 5.5*d cycles per Toffoli at d near 30 and ~1 us per round gives
+    # 165 us; the paper rounds to 170 and computes everything downstream from it.
     toffoli_s: float = 170e-6
 
-    # Eq. 8: t_Q >= 17 ms. A primitive needs G >= N Toffolis, and the paper
-    # argues no problem worth accelerating fits under about a hundred qubits,
-    # so N = 100. Exactly 100 x toffoli_s.
+    # Eq. 8: 100 Toffolis, the paper's floor on a primitive worth accelerating.
     lb_quantum_s: float = 17e-3
-    # Eq. 10: t_C <= 33 ns. A 3 GHz CPU gives t_C = 330 ps x L, with one clock
-    # cycle per Toffoli (L = N = 100) -- an equivalence the paper itself flags
-    # as generous to the quantum side, since one classical cycle often does
-    # the work of thousands of Toffolis.
+    # Eq. 10: 3 GHz CPU, one clock cycle per Toffoli, L = 100.
     lb_classical_s: float = 33e-9
 
-    # Eq. 9: t_Q = 440 ms. For an N = 512 Sherrington-Kirkpatrick instance,
-    # the compilation of Sanders et al. (PRX Quantum 1, 020312 (2020)) puts
-    # one update at about 2.6e3 Toffolis; 2.6e3 x toffoli_s = 442 ms, rounded.
+    # Eq. 9: one N=512 Sherrington-Kirkpatrick update in the compilation of
+    # Sanders et al., PRX Quantum 1, 020312 (2020).
     sa_toffolis: float = 2.6e3
     sa_quantum_s: float = 440e-3
-    # Eq. 11: t_C = 7 ns. A performant classical simulated-annealing step for
-    # the same N = 512 instance, rejected updates included -- techniques of
-    # Isakov et al., Comput. Phys. Commun. 192, 265 (2015); the figure is
-    # quoted via Sanders et al.
+    # Eq. 11: classical simulated-annealing step for the same instance,
+    # rejected updates included (Isakov et al. 2015, quoted via Sanders et al.).
     sa_classical_s: float = 7e-9
 
     def __post_init__(self) -> None:
         assert min(vars(self).values()) > 0
-        # Internal consistency with the paper's own arithmetic: the quoted
-        # times are round-offs of the Toffoli counts times the gate time.
+        # The quoted times are round-offs of Toffoli count times gate time.
         assert abs(5.5 * 30 * 1e-6 - self.toffoli_s) / self.toffoli_s < 0.04
         assert abs(100 * self.toffoli_s - self.lb_quantum_s) < 1e-12
         rel = abs(self.sa_toffolis * self.toffoli_s - self.sa_quantum_s)
@@ -132,9 +96,8 @@ class Breakeven:
 
 BABBUSH_2021 = Breakeven()
 
-# Classical reference points: round, widely quoted figures for commodity
-# hardware, to calibrate intuition on a log scale. Bit rates are payload rates,
-# not raw symbol rates, so they compare like-for-like against a syndrome stream.
+# Commodity-hardware reference points. Bit rates are payload rates, not raw
+# symbol rates, so they compare like-for-like against a syndrome stream.
 BANDWIDTH_REFS = [  # (label, bits per second)
     ("10 GbE network port", 10e9),
     ("NVMe Gen5 SSD, sequential read", 112e9),
